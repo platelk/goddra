@@ -20,6 +20,7 @@ func CreateProgram(gl *webgl.WebGL, vertexShader, fragShader *webgl.Shader) (*we
 func CreateShader(gl *webgl.WebGL, shaderType webgl.GLType, source string) (*webgl.Shader, error) {
 	shader := gl.CreateShader(shaderType)
 	shader.Source(source)
+	shader.Compile()
 	if shader.GetCompileStatus() {
 		return shader, nil
 	}

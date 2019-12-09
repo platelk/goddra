@@ -1,6 +1,8 @@
 package webgl
 
-import "syscall/js"
+import (
+	"syscall/js"
+)
 
 type Buffer struct {
 	value js.Value
@@ -13,6 +15,10 @@ func (b *Buffer) Bind(t GLType) {
 	b.wg.BindBuffer(t, b)
 }
 
-func (b *Buffer) Data(data interface{}, g GLType) {
-	b.wg.BufferData(b.t, data, g)
+func (b *Buffer) BindToArrayBuffer() {
+	b.Bind(b.wg.types.ArrayBuffer)
+}
+
+func (b *Buffer) Float32ArrayData(data Float32Array, g GLType) {
+	b.wg.BufferData(b.t, js.Value(data), g)
 }

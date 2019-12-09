@@ -37,6 +37,18 @@ func NewWebGL(canvasEl js.Value) (*WebGL, error) {
 	return wg, nil
 }
 
+func (wg *WebGL) Width() int {
+	return wg.width
+}
+
+func (wg *WebGL) Height() int {
+	return wg.height
+}
+
+func (wg *WebGL) Types() *GLTypes {
+	return wg.types
+}
+
 func (wg *WebGL) Resize() {
 	width := wg.canvasEl.Get("clientWidth").Int()
 	height := wg.canvasEl.Get("clientHeight").Int()
@@ -57,7 +69,7 @@ func (wg *WebGL) ClearColor(r, g, b, a float32) {
 }
 
 func (wg *WebGL) Clear(t GLType) {
-	wg.gl.Call("clear", t)
+	wg.gl.Call("clear", t.Value())
 }
 
 func (wg *WebGL) UseProgram(p *Program) {
@@ -65,11 +77,11 @@ func (wg *WebGL) UseProgram(p *Program) {
 }
 
 func (wg *WebGL) Enable(t GLType) {
-	wg.gl.Call("enable", t)
+	wg.gl.Call("enable", t.Value())
 }
 
 func (wg *WebGL) DrawArrays(drawType GLType, from, to int) {
-	wg.gl.Call("drawArrays", drawType, from, to)
+	wg.gl.Call("drawArrays", drawType.Value(), from, to)
 }
 
 // =============
@@ -77,7 +89,7 @@ func (wg *WebGL) DrawArrays(drawType GLType, from, to int) {
 // =============
 
 func (wg *WebGL) CreateShader(shaderType GLType) *Shader {
-	shader := wg.gl.Call("createShader", shaderType)
+	shader := wg.gl.Call("createShader", shaderType.Value())
 	return &Shader{value: shader, wg: wg}
 }
 
@@ -138,11 +150,11 @@ func (wg *WebGL) DeleteProgram(program *Program) {
 }
 
 func (wg *WebGL) GetProgramParameter(program *Program, parameters GLType) js.Value {
-	return wg.gl.Call("getProgramParameter", program.value, parameters)
+	return wg.gl.Call("getProgramParameter", program.value, parameters.Value())
 }
 
 func (wg *WebGL) GetProgramLinkStatus(program *Program) bool {
-	return wg.gl.Call("getProgramParameter", program.value, wg.types.LinkStatus).Bool()
+	return wg.gl.Call("getProgramParameter", program.value, wg.types.LinkStatus.Value()).Bool()
 }
 
 func (wg *WebGL) GetProgramInfoLog(program *Program) string {
@@ -163,11 +175,11 @@ func (wg *WebGL) CreateBuffer() *Buffer {
 }
 
 func (wg *WebGL) BindBuffer(t GLType, b *Buffer) {
-	wg.gl.Call("bindBuffer", t, b.value)
+	wg.gl.Call("bindBuffer", t.Value(), b.value)
 }
 
-func (wg *WebGL) BufferData(t GLType, data interface{}, d GLType) {
-	wg.gl.Call("bufferData", t, data, d)
+func (wg *WebGL) BufferData(t GLType, data js.Value, d GLType) {
+	wg.gl.Call("bufferData", t.Value(), data, d.Value())
 }
 
 // =============
@@ -190,5 +202,5 @@ func (wg *WebGL) EnableVertexAttribArray(a *Attribute) {
 func (wg *WebGL) VertexAttribPointer(a *Attribute, size int, ty GLType, normalize bool, stride, offset int) {
 	wg.gl.Call("vertexAttribPointer",
 		a.value, size,
-		ty, normalize, stride, offset)
+		ty.Value(), normalize, stride, offset)
 }

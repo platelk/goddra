@@ -24,7 +24,7 @@ func Run() {
 	// Init Canvas stuff
 	doc := js.Global().Get("document")
 	canvasEl := doc.Call("getElementById", "gocanvas")
-	w, err := webglrender.NewWebGL(canvasEl)
+	w, err := webglrender.NewWebGLRender(canvasEl)
 	if err != nil {
 		fmt.Println(err)
 		return

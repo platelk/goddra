@@ -4,6 +4,10 @@ import "syscall/js"
 
 type GLType js.Value
 
+func (g GLType) Value() js.Value {
+	return js.Value(g)
+}
+
 // GLTypes provides WebGL bindings.
 type GLTypes struct {
 	StaticDraw         GLType
