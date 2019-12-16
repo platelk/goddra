@@ -5,6 +5,7 @@ import (
 	"syscall/js"
 )
 
+// ErrNotCompatibleBrowser is returned when the browser is incompatible with the version of webgl required
 var ErrNotCompatibleBrowser = fmt.Errorf("browser don't support webglrender")
 
 type WebGL struct {
