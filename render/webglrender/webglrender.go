@@ -2,13 +2,19 @@ package webglrender
 
 import (
 	"fmt"
-	"goddra/render/webgl"
-	"goddra/render/webgl/wgutils"
+	"goddra/color"
+	"goddra/geom"
+	"goddra/render/webglrender/shaders"
+	"goddra/webgl"
+	"goddra/webgl/wgutils"
 	"syscall/js"
 )
 
 type WebGLRender struct {
-	gl *webgl.WebGL
+	gl              *webgl.WebGL
+	backgroundColor color.Color
+	renderProg      map[string]func(...interface{}) error
+	renderPipeline  map[string][]interface{}
 }
 
 func NewWebGLRender(canvasEl js.Value) (*WebGLRender, error) {
@@ -18,15 +24,22 @@ func NewWebGLRender(canvasEl js.Value) (*WebGLRender, error) {
 		return nil, fmt.Errorf("can't instanciate WebGL for renderer: %w", err)
 	}
 	wgr.gl = gl
+	wgr.backgroundColor = color.New(1.0, 1.0, 1.0, 1.0)
+	wgr.renderProg = make(map[string]func(...interface{})error)
+	wgr.renderPipeline = make(map[string][]interface{})
+	err = wgr.initTriangleColorProg()
+	if err != nil {
+		return nil, err
+	}
 	return wgr, nil
 }
 
-func (wgr *WebGLRender) DrawTriangle() error {
-	vshader, err := wgutils.CreateShader(wgr.gl, wgr.gl.Types().VertexShader, triangleVertexShaderSource)
+func (wgr *WebGLRender) initTriangleColorProg() error {
+	vshader, err := wgutils.CreateShader(wgr.gl, wgr.gl.Types().VertexShader, shaders.TriangleVertexShaderSource)
 	if err != nil {
 		return err
 	}
-	fshader, err := wgutils.CreateShader(wgr.gl, wgr.gl.Types().FragmentShader, triangleFragmentShaderSource)
+	fshader, err := wgutils.CreateShader(wgr.gl, wgr.gl.Types().FragmentShader, shaders.TriangleFragmentShaderSource)
 	if err != nil {
 		return err
 	}
@@ -35,66 +48,79 @@ func (wgr *WebGLRender) DrawTriangle() error {
 		return err
 	}
 	aPosLoc := prog.GetAttribute("a_position")
+	colorLoc := prog.GetUniformLoc("u_color")
+	resLoc := prog.GetUniformLoc("u_resolution")
+	transLoc := prog.GetUniformLoc("u_translation")
 	posBuff := wgr.gl.CreateBuffer()
-	posBuff.BindToArrayBuffer()
-	posBuff.Float32ArrayData(wgutils.ToFloat32Array([]float32{
-		0, 0,
-		0, 0.5,
-		0.7, 0,
-	}), wgr.gl.Types().StaticDraw)
 	vao := wgr.gl.CreateVertexArray()
-	vao.Bind()
-	wgr.gl.EnableVertexAttribArray(aPosLoc)
-	// Tell the attribute how to get data out of positionBuffer (ARRAY_BUFFER)
-	size := 2          // 2 components per iteration
-	ty := wgr.gl.Types().Float      // the data is 32bit floats
-	normalize := false // don't normalize the data
-	stride := 0        // 0 = move forward size * sizeof(type) each iteration to get the next position
-	offset := 0        // start at the beginning of the buffer
-	wgr.gl.VertexAttribPointer(
-		aPosLoc, size,
-		ty, normalize, stride, offset)
-	wgr.gl.Viewport(0, 0, wgr.gl.Width(), wgr.gl.Height())
-	wgr.gl.ClearColor(0.8, 0.8, 0.8, 0.9)
-	wgr.gl.Clear(wgr.gl.Types().ColorBufferBit)
 
-	wgr.gl.UseProgram(prog)
-	wgr.gl.BindVertexArray(vao)
-	wgr.gl.Enable(wgr.gl.Types().DepthTest)
-	wgr.gl.DrawArrays(wgr.gl.Types().Triangles, 0, 3)
+
+	wgr.renderProg["triangle_color"] = func(i ...interface{}) error {
+		// -- Setup vertex
+		posBuff.BindToArrayBuffer()
+		vao.Bind()
+		wgr.gl.EnableVertexAttribArray(aPosLoc)
+			// Tell the attribute how to get data out of positionBuffer (ARRAY_BUFFER)
+		size := 2          // 2 components per iteration
+		ty := wgr.gl.Types().Float      // the data is 32bit floats
+		normalize := false // don't normalize the data
+		stride := 0        // 0 = move forward size * sizeof(type) each iteration to get the next position
+		offset := 0        // start at the beginning of the buffer
+		wgr.gl.VertexAttribPointer(
+			aPosLoc, size,
+			ty, normalize, stride, offset)
+		// -- end setup
+		wgr.gl.UseProgram(prog)
+		wgr.gl.BindVertexArray(vao)
+		for _, ii := range i {
+			t, ok := ii.(geom.Shape)
+			if !ok {
+				return fmt.Errorf("expect (graphic.Shape) but got %t", i)
+			}
+
+			colorLoc.SetUniform(0.8, 0.8, 0.8, 0.8)
+			resLoc.SetUniform(float32(wgr.gl.Width()), float32(wgr.gl.Height()))
+			transLoc.SetUniform(t.Position().Values()...)
+			points := t.Points()
+			posBuff.Float32ArrayData(wgutils.ToFloat32Array(points), wgr.gl.Types().StaticDraw)
+			fmt.Println("draw")
+			wgr.gl.DrawArrays(wgr.gl.Types().Triangles, 0, len(points)/t.Dim())
+		}
+		return nil
+	}
 	return nil
 }
 
-func (wgr *WebGLRender) Render() {
-
+func (wgr *WebGLRender) DrawTriangle(t *geom.Triangle) error {
+	wgr.renderPipeline["triangle"] = append(wgr.renderPipeline["triangle"], t)
+	return nil
 }
 
-const triangleVertexShaderSource = `#version 300 es
-
-// an attribute is an input (in) to a vertex shader.
-// It will receive data from a buffer
-in vec4 a_position;
-
-// all shaders have a main function
-void main() {
-
-  // gl_Position is a special variable a vertex shader
-  // is responsible for setting
-  gl_Position = a_position;
+func (wgr *WebGLRender) DrawRectangle(t *geom.Rectangle) error {
+	wgr.renderPipeline["triangle"] = append(wgr.renderPipeline["triangle"], t)
+	return nil
 }
-`
-
-const triangleFragmentShaderSource = `#version 300 es
-
-// fragment shaders don't have a default precision so we need
-// to pick one. mediump is a good default. It means "medium precision"
-precision mediump float;
-
-// we need to declare an output for the fragment shader
-out vec4 outColor;
-
-void main() {
-  // Just set the output to a constant redish-purple
-  outColor = vec4(1, 0, 0.5, 1);
+func (wgr *WebGLRender) Resize() {
+	wgr.gl.Viewport(0, 0, wgr.gl.Width(), wgr.gl.Height())
 }
-`
+
+func (wgr *WebGLRender) Clear() {
+	wgr.gl.ClearColor(wgr.backgroundColor.R(), wgr.backgroundColor.G(), wgr.backgroundColor.B(), wgr.backgroundColor.A())
+	wgr.gl.Clear(wgr.gl.Types().ColorBufferBit)
+}
+
+func (wgr *WebGLRender) BackgroundColor(color color.Color) {
+	wgr.backgroundColor = color
+}
+
+func (wgr *WebGLRender) Render() error {
+	wgr.Resize()
+	wgr.Clear()
+	for k, v := range wgr.renderPipeline {
+		if err := wgr.renderProg[k](v...); err != nil {
+			return err
+		}
+		wgr.renderPipeline[k] = []interface{}{}
+	}
+	return nil
+}

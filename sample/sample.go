@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"goddra/assetmanager"
 	"goddra/assetmanager/fetcher"
+	"goddra/geom"
 	"goddra/render/webglrender"
 	"syscall/js"
 )
@@ -29,7 +30,10 @@ func Run() {
 		fmt.Println(err)
 		return
 	}
-	fmt.Println(w.DrawTriangle())
+	rec := geom.NewRectangle(150, 400)
+	rec.SetPosition(geom.Vec2{50, 50})
+	fmt.Println(w.DrawRectangle(rec))
+	fmt.Println(w.Render())
 }
 
 func main() {

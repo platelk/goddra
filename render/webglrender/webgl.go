@@ -2,7 +2,7 @@ package webglrender
 
 import (
 	"fmt"
-	"goddra/render/webgl"
+	"goddra/webgl"
 	"syscall/js"
 )
 
