@@ -2,8 +2,8 @@ package webglrender
 
 import (
 	"fmt"
-	"goddra/color"
 	"goddra/geom"
+	"goddra/graphic/color"
 	"goddra/render/webglrender/shaders"
 	"goddra/webgl"
 	"goddra/webgl/wgutils"
